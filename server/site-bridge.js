@@ -118,13 +118,27 @@
     else if (n > 1) location.hash = '#/' + n;
   }
   function where() {
-    return page() + location.hash + '|' + window.scrollY;
+    // reveal.js may keep its place out of the URL, and ↑/↓ move between its vertical slides.
+    var r = reveal();
+    var i = r && r.getIndices();
+    return (i ? [i.h, i.v, i.f].join('.') : page()) + location.hash + '|' + window.scrollY;
+  }
+  // Older decks (reveal.js among them) read keyCode rather than key, so set both.
+  var KEY_CODES = { ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40 };
+  function dispatchKey(key) {
+    ['keydown', 'keyup'].forEach(function (type) {
+      var e = new KeyboardEvent(type, { key: key, code: key, bubbles: true, cancelable: true });
+      var code = KEY_CODES[key];
+      if (code)
+        ['keyCode', 'which'].forEach(function (p) {
+          Object.defineProperty(e, p, { value: code });
+        });
+      document.dispatchEvent(e);
+    });
   }
   function press(key) {
     var before = where();
-    ['keydown', 'keyup'].forEach(function (type) {
-      document.dispatchEvent(new KeyboardEvent(type, { key: key, code: key, bubbles: true, cancelable: true }));
-    });
+    dispatchKey(key);
     // A page without slides ignores arrow keys: scroll by most of a screen instead.
     setTimeout(function () {
       if (where() !== before) return;
@@ -135,6 +149,25 @@
   function scrollTo(x, y) {
     window.scrollTo({ left: x, top: y, behavior: 'instant' });
   }
+
+  // Presentation remotes differ (Canon's send only ↑/↓) and many decks listen only for ←/→.
+  // When the page ignores one of these keys, press the arrow it stands for.
+  var TURN = { ArrowDown: 'ArrowRight', PageDown: 'ArrowRight', ArrowUp: 'ArrowLeft', PageUp: 'ArrowLeft' };
+  addEventListener(
+    'keydown',
+    function (e) {
+      var t = e.target;
+      if (!e.isTrusted || !TURN[e.key] || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      var before = where();
+      setTimeout(function () {
+        // A deck that handles the key moves or calls preventDefault. reveal.js claims ↑/↓ even
+        // with no slide below, so for it only a move counts.
+        if (where() === before && !(e.defaultPrevented && !reveal())) dispatchKey(TURN[e.key]);
+      }, 150);
+    },
+    true,
+  );
 
   addEventListener('message', function (e) {
     var m = e.data;

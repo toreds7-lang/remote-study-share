@@ -15,9 +15,10 @@ for (const file of ['.env', 'env.txt']) {
 }
 
 const dataDir = path.resolve(ROOT, process.env.DATA_DIR ?? 'data');
+const port = Number(process.env.PORT ?? 3000);
 
 export const config = {
-  port: Number(process.env.PORT ?? 3000),
+  port,
   host: process.env.HOST ?? '0.0.0.0',
   prod: process.argv.includes('--prod') || process.env.NODE_ENV === 'production',
   dataDir,
@@ -33,6 +34,17 @@ export const config = {
   sofficePath: process.env.SOFFICE_PATH ?? '',
   /** Set to 1 behind a reverse proxy (nginx, Caddy) so client IPs and https are detected. */
   trustProxy: process.env.TRUST_PROXY === '1',
+  screen: {
+    enabled: process.env.SCREEN_SHARE !== 'off',
+    /** WebRTC port (UDP, and TCP as a fallback); the 99 UDP ports after it carry pipes to relay PCs. */
+    port: Number(process.env.SCREEN_PORT || port + 1),
+    /** Addresses offered to viewers; empty = every IPv4 address of this PC. */
+    ips: (process.env.SCREEN_IP ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    /** How many students this PC serves before relay PCs take the rest (a share, not a limit). */
+    directSeats: Math.max(1, Number(process.env.SCREEN_DIRECT_SEATS || 10)),
+    /** Password relay PCs connect with; empty = generated once and kept in DATA_DIR/relay.key. */
+    relayKey: process.env.RELAY_KEY ?? '',
+  },
 };
 
 fs.mkdirSync(config.uploadsDir, { recursive: true });

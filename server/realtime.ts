@@ -5,10 +5,10 @@ import { LIMITS, pageAfterEdit } from '../shared/protocol.ts';
 import { getCookie, RateLimiter, SESSION_COOKIE, userFromToken, type SessionUser } from './auth.ts';
 import { config } from './config.ts';
 import { officeExts } from './convert.ts';
+import { UserError } from './errors.ts';
 import * as repo from './repo.ts';
 import * as S from './schemas.ts';
-
-export class UserError extends Error {}
+import { screenEvents, screenState, serverUrls } from './screen.ts';
 
 const roomChannel = (code: string) => `room:${code}`;
 const teachersChannel = (code: string) => `teachers:${code}`;
@@ -65,6 +65,8 @@ function snapshot(user: SessionUser): Snapshot {
     hands: user.role === 'teacher' ? handList(room.code) : [],
     myHandRaised: hands.get(room.code)?.has(user.id) ?? false,
     aiEnabled: !!config.openaiKey,
+    screen: screenState(room.code, user.role === 'teacher'),
+    serverUrls: user.role === 'teacher' ? serverUrls() : [],
   };
 }
 
@@ -154,14 +156,17 @@ function onConnection(socket: Socket, user: SessionUser) {
   socket.emit('snapshot', snapshot(user));
   io.to(room).emit('presence', onlineList(code));
 
-  /** Registers a validated event handler. The handler's return value is sent back via ack. */
+  /**
+   * Registers a validated event handler. The handler's return value (or what its promise
+   * resolves to) is sent back via ack.
+   */
   function handle<T extends z.ZodType>(
     event: string,
     schema: T,
     fn: (data: z.infer<T>) => unknown,
     opts: { teacherOnly?: boolean; limiter?: RateLimiter } = {},
   ) {
-    socket.on(event, (raw: unknown, ack?: unknown) => {
+    socket.on(event, async (raw: unknown, ack?: unknown) => {
       const reply: Reply = typeof ack === 'function' ? (ack as Reply) : () => {};
       try {
         if (opts.teacherOnly && !isTeacher) return reply({ ok: false, error: '강사만 할 수 있어요.' });
@@ -169,7 +174,7 @@ function onConnection(socket: Socket, user: SessionUser) {
           return reply({ ok: false, error: '너무 자주 보내고 있어요. 잠시 후 다시 시도하세요.' });
         const parsed = schema.safeParse(raw);
         if (!parsed.success) return reply({ ok: false, error: '잘못된 요청입니다.' });
-        reply({ ok: true, data: fn(parsed.data) });
+        reply({ ok: true, data: await fn(parsed.data) });
       } catch (err) {
         if (err instanceof UserError) reply({ ok: false, error: err.message });
         else {
@@ -338,6 +343,8 @@ function onConnection(socket: Socket, user: SessionUser) {
     repo.deleteQuestion(id);
     io.to(room).emit('question:deleted', id);
   });
+
+  screenEvents(socket, user, room, handle);
 
   // ---- chat ----
 

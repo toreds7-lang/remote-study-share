@@ -1,5 +1,4 @@
 import { createServer } from 'node:http';
-import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
 import { Server } from 'socket.io';
@@ -7,6 +6,7 @@ import { createApi } from './api.ts';
 import { config, ROOT } from './config.ts';
 import { officeConverters } from './convert.ts';
 import { setupRealtime } from './realtime.ts';
+import { screenSummary, serverUrls, setupScreen } from './screen.ts';
 
 const app = express();
 const httpServer = createServer(app);
@@ -20,6 +20,7 @@ const io = new Server(httpServer, {
   destroyUpgrade: config.prod,
 });
 setupRealtime(io);
+await setupScreen(io);
 
 app.use('/api', createApi());
 
@@ -44,13 +45,11 @@ if (config.prod) {
 }
 
 httpServer.listen(config.port, config.host, () => {
-  const lan = Object.values(os.networkInterfaces())
-    .flat()
-    .filter((i) => i && i.family === 'IPv4' && !i.internal)
-    .map((i) => `http://${i!.address}:${config.port}`);
   console.log(`\n  Study Share ${config.prod ? '(production)' : '(dev)'} running`);
   console.log(`  Local:   http://localhost:${config.port}`);
-  for (const url of lan) console.log(`  Network: ${url}`);
+  // The real network card first; virtual adapters (WSL, Hyper-V, VPN) last.
+  for (const url of serverUrls()) console.log(`  Network: ${url}`);
   console.log(`  AI helper: ${config.openaiKey ? `on (${config.llmModel})` : 'off (set OPENAI_API_KEY)'}`);
-  console.log(`  Office → 교안: ${officeConverters || 'off (install LibreOffice, or Microsoft Office on Windows)'}\n`);
+  console.log(`  Office → 교안: ${officeConverters || 'off (install LibreOffice, or Microsoft Office on Windows)'}`);
+  console.log(`  화면 공유: ${screenSummary()}\n`);
 });

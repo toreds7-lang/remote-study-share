@@ -165,6 +165,35 @@ export interface RaisedHand {
   at: number;
 }
 
+/** A PC that sends the teacher's shared screen to students: the teacher's own PC or a relay PC. */
+export interface ScreenNode {
+  id: string;
+  name: string;
+  /** IP address, as the teacher's server sees it. */
+  address: string;
+  relay: boolean;
+  /** Students watching through this PC (in every class). */
+  viewers: number;
+  /** Students this PC should take before others get more; nobody is turned away. */
+  seats: number;
+}
+
+export interface ScreenState {
+  /** The teacher is sharing a screen. */
+  live: boolean;
+  /** Teachers only: why screen sharing can't be used on this server ('' if it can). */
+  error?: string;
+  /** Teachers only: the PCs that send the screen to students. */
+  nodes?: ScreenNode[];
+}
+
+/** Teachers only: what a relay PC needs to join, for the "릴레이 PC 추가" instructions. */
+export interface RelayInfo {
+  key: string;
+  /** This server's addresses, e.g. http://10.0.0.5:3000. */
+  urls: string[];
+}
+
 export interface Snapshot {
   room: RoomInfo;
   me: Me;
@@ -183,6 +212,9 @@ export interface Snapshot {
   hands: RaisedHand[];
   myHandRaised: boolean;
   aiEnabled: boolean;
+  screen: ScreenState;
+  /** Teachers only: this server on its LAN addresses (likeliest first), for links students can open. */
+  serverUrls: string[];
 }
 
 export interface DocStrokes {

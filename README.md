@@ -14,12 +14,15 @@ A self-hosted study room modeled on the 교안 tab of the LMS. The teacher share
 | 내 필기 | The same tools on a private layer. Notes are stored on the server per student, so they survive refresh and follow the student to other devices if a password was set. A stylus turns on palm rejection. |
 | Capture / download | 📷 saves the current page as a PNG with the visible ink. ⬇ downloads the PDF with the ink merged into the annotated pages (for converted files, the converted PDF). On an HTML 교안, ⬇ downloads the uploaded file and 📷 is off. |
 | Side panel (분할 보기) | **질문**: anonymous option, likes, 좋아요순/최신순 sort, teacher answers, mark resolved; each question is linked to its page (`p.N` jumps there). **채팅**. **AI 도우미**: optional. |
+| 화면 공유 | The teacher shares a screen or window (**화면 공유** in the 교안 toolbar) for things that aren't a 교안: code, software demos, video. Students who follow see it in place of the 교안, can switch back with **교안 보기**, and double-click for fullscreen. The teacher's PC encodes it **once**, whatever the class size, and picks the graphics chip's encoder when there is one. Two modes: **글자·코드 선명하게** (15 fps, sharp text) and **동영상 부드럽게** (30 fps). Optional **relay PCs** take part of the class off the teacher's PC; see [화면 공유 and relay PCs](#화면-공유-and-relay-pcs). |
 | Raise hand ✋ | Students raise or lower a hand. The teacher sees a badge and a list, and can lower one hand or all of them. |
 | 파일 (shared files) | The teacher uploads any file type (multi-select or drag and drop) with an optional tag such as `추가자료`, and everyone can download. Files are grouped by date (오늘 / 어제 / 이번 주 / 이번 달 / 이전), with list/card views, type filters (이미지, PDF, 노트북, 코드·데이터, 문서), search (`#tag` filters by tag), and **모두 받기**, which downloads the current list as one ZIP. Images, text/code and Jupyter notebooks preview in the page, and PDFs open in a new tab. 교안 PDFs appear here too, and the **교안** button opens them in the 교안 tab. |
 | 파일: teacher tools | **숨기기/공개**: upload ahead of time (e.g. answers) and reveal later. Students never receive hidden files. **다운로드 현황**: a live count per file, plus who has and hasn't downloaded. **이름·태그 수정**, **교안으로 등록** (turn an uploaded PDF, Office file, image, HTML page or ZIP into a 교안), and delete. Students get a toast and a badge on the 파일 tab when a file is shared. |
 | Other | 홈 (class info, who's online, copy join link), dark mode, fullscreen, keyboard ←/→ and Ctrl+Z, mobile layout. 실습 is a placeholder. |
 
 ## Quick start
+
+**Windows, one click:** double-click `run.bat`. It installs dependencies on the first run, rebuilds the client when its source changed, starts the production server and opens the browser. Close the window to stop the server. Double-clicking it again while it is running only opens the browser.
 
 Requires Node.js 22.13+ (tested with 24). On this PC Node is installed at `C:\Program Files\nodejs` but is not on `PATH` in every shell. If `npm` isn't found, run this first in PowerShell: `$env:Path = "C:\Program Files\nodejs;$env:Path"`.
 
@@ -55,6 +58,29 @@ Settings are read from `.env` or `env.txt` in the project root (see [.env.exampl
 | `OFFICE_CONVERTER` | `auto` | How Office files become 교안: `auto` (Microsoft Office if installed, else LibreOffice), `msoffice`, `libreoffice` or `off` |
 | `SOFFICE_PATH` | *(empty)* | LibreOffice's `soffice` binary, if it isn't on `PATH` or in the usual install folder |
 | `OPENAI_API_KEY`, `LLM_MODEL` | *(empty)*, `gpt-4o-mini` | Turns on the AI 도우미 tab. The key is used only on the server. |
+| `SCREEN_SHARE` | *(on)* | `off` turns 화면 공유 off |
+| `SCREEN_PORT` | `PORT`+1 | 화면 공유 to students on UDP and TCP; the 99 UDP ports after it carry the screen to relay PCs |
+| `SCREEN_IP` | *(every IPv4 address)* | Comma-separated addresses to offer students, if the automatic list picks a wrong adapter |
+| `SCREEN_DIRECT_SEATS` | `10` | Students the teacher's PC serves before relay PCs get more (a share, not a limit) |
+| `RELAY_KEY` | *(generated)* | Password relay PCs connect with. Empty = made once and kept in `DATA_DIR/relay.key` |
+
+## 화면 공유 and relay PCs
+
+The browser only lets a page capture the screen on `localhost` or over HTTPS, so the teacher opens StudyShare on their own PC at `http://localhost:3000` (`run.bat` does). Students use the PC's network address. **홈 → 학생 입장 링크 복사** gives that address even when the teacher is on `localhost`.
+
+Run `firewall.bat` once on the teacher's PC. It asks for administrator rights and opens TCP 3000 (the page), UDP and TCP 3001 (screen to students), and UDP 3002–3100 (screen to relay PCs), on Domain and Private networks only. `firewall.bat remove` undoes it. On a company PC, IT may have to do this, or a group policy may override it.
+
+**How the load works.** The teacher's browser encodes the screen once and sends it to the server, which copies packets to each student without decoding them (an SFU, [mediasoup](https://mediasoup.org)). The teacher's PC therefore does one encode regardless of class size, and forwarding is cheap. Measured on a Ryzen 5 3600 with 30 students and a worst-case 1080p stream at the 2.5 Mbps cap, the forwarding process used about 20% of one CPU core, and the PC sent about 75 Mbps. What grows with the class is **network traffic**: about 2.5 Mbps per student (5 Mbps in 동영상 mode). Compare that to the teacher PC's link speed (`Get-NetAdapter` → LinkSpeed): 30 students fit easily on gigabit Ethernet, but not in 동영상 mode on a 100 Mbps port or over Wi-Fi.
+
+**Relay PCs** add capacity where that runs out. A relay receives the screen once from the teacher's PC and sends it to the students the server assigns to it. Students never pick a PC; they all open the teacher's address. The server puts each new student on the PC with the most free seats (`SCREEN_DIRECT_SEATS` on the teacher's PC, `--seats`, default 30, on a relay). If a relay is switched off, its students move to another PC within seconds. A student who gets no picture through a PC (a firewall, say) is moved too. A relay only helps if it has its own network link: on the same Wi-Fi as the students, it adds traffic instead of removing it.
+
+To add a relay PC:
+
+1. On the teacher's PC, run `npm run relay:bundle` once. This makes `relay-bundle/` (about 100 MB): Node itself, the relay as one script, the mediasoup worker and batch files. Nothing has to be installed on the relay PC.
+2. Copy the folder to the spare PC, and run its `firewall.bat` once.
+3. Run `run-relay.bat`, and enter the address and key shown under **화면 공유 → 릴레이 PC 연결 방법**. The teacher's sharing panel then lists the PC and its students.
+
+From a checkout with Node installed, `npm run relay -- --origin http://<teacher-pc>:3000 --key <key>` does the same.
 
 ## How it works
 
@@ -84,10 +110,15 @@ server/   index.ts (HTTP + Vite/dist) · api.ts (REST, uploads, downloads) · re
           repo.ts / db.ts (SQLite) · auth.ts · schemas.ts · ai.ts (OpenAI streaming) · zip.ts (streaming ZIP)
           convert.ts (images/Office/whiteboards → PDF, page edits) · office-to-pdf.ps1 (Microsoft Office)
           site.ts + site-bridge.js (live HTML) · unzip.ts
-client/   src/components/PdfViewer.tsx · HtmlViewer.tsx · InkLayers.tsx (drawing) · LecturePane.tsx (toolbar)
+          screen.ts (화면 공유: shares, relay PCs, which PC serves whom) · media.ts (mediasoup, also used by relays)
+          relay.ts (relay PC program) · relay-bundle.ts (npm run relay:bundle)
+client/   src/screen.ts (capture, send, receive, switch PC) · components/ScreenShare.tsx (화면 공유 UI)
+          src/components/PdfViewer.tsx · HtmlViewer.tsx · InkLayers.tsx (drawing) · LecturePane.tsx (toolbar)
           FilesPane.tsx (파일) · lecture.ts (adding 교안 and pages) · frame.ts (talks to the HTML frame)
           Questions / Chat / AiPanel / Room / Lobby / Modal · store.ts (zustand) · socket.ts · export.ts
 shared/   protocol.ts (types shared by both sides) · files.ts (file kinds, preview rules)
+relay/    run-relay.bat · firewall.bat · README.txt (copied into relay-bundle/)
+firewall.bat + firewall.ps1   open Windows Firewall for the page and 화면 공유
 ```
 
 ## Suggested next steps

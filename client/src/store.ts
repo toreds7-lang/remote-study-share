@@ -15,6 +15,7 @@ import type {
   Question,
   RaisedHand,
   RoomInfo,
+  ScreenState,
   Snapshot,
   Stroke,
 } from '../../shared/protocol.ts';
@@ -35,6 +36,15 @@ export interface AiMessage {
 }
 
 type StrokeMap = Record<string, Stroke[]>;
+
+export interface MyShare {
+  stream: MediaStream;
+  /** Tuned for video (smooth) rather than text and code (sharp). */
+  motion: boolean;
+  /** e.g. 'H264'; empty until the stream is sent. */
+  codec: string;
+  hardware: boolean;
+}
 
 /** What the live HTML 교안 frame last reported: its slide (`total` 0 = unknown) and scroll offset. */
 export interface FrameState {
@@ -72,6 +82,19 @@ interface State {
   frame: FrameState | null;
   /** Teacher's upload/conversion progress for the toolbar, e.g. "PDF로 변환 중…". */
   uploadStatus: string | null;
+
+  /** 화면 공유 as the server reports it. */
+  screen: ScreenState;
+  /** Student: show the teacher's shared screen in place of the 교안. */
+  screenView: boolean;
+  /** Student: the shared screen as received, the PC it comes through, and connection progress. */
+  screenTrack: MediaStreamTrack | null;
+  screenVia: string | null;
+  screenStatus: string | null;
+  /** Teacher: this browser is sharing a screen. */
+  myShare: MyShare | null;
+  /** Teachers only: the server's LAN addresses, likeliest first. */
+  serverUrls: string[];
 
   showTeacherInk: boolean;
   drawMode: boolean;
@@ -129,6 +152,14 @@ export const useStore = create<State>()(() => ({
   laser: null,
   frame: null,
   uploadStatus: null,
+
+  screen: { live: false },
+  screenView: true,
+  screenTrack: null,
+  screenVia: null,
+  screenStatus: null,
+  myShare: null,
+  serverUrls: [],
 
   showTeacherInk: readPref('ss.showTeacherInk', true),
   drawMode: false,
@@ -189,7 +220,30 @@ export function applySnapshot(snap: Snapshot) {
     hands: snap.hands,
     myHand: snap.myHandRaised,
     ai: sameUser ? prev.ai : [],
+    screen: snap.screen,
+    serverUrls: snap.serverUrls,
   });
+}
+
+/**
+ * This server as other PCs reach it. The teacher opens it at localhost (the browser only allows
+ * screen capture there, or over HTTPS), and a localhost link is no use to students.
+ */
+export function publicOrigin(serverUrls = get().serverUrls): string {
+  const local = /^(localhost|127\.|\[::1\]$)/.test(location.hostname);
+  return (local && serverUrls[0]) || location.origin;
+}
+
+/** The teacher started or stopped sharing a screen. Following students switch to it. */
+export function onScreenState({ live }: ScreenState) {
+  const s = get();
+  if (live === s.screen.live) return;
+  const student = s.me?.role === 'student';
+  set({ screen: { ...s.screen, live }, ...(live && student ? { screenView: s.follow } : {}) });
+  if (!student) return;
+  if (!live) toast('강사 화면 공유가 끝났어요.');
+  else if (s.follow) toast('🖥 강사가 화면 공유를 시작했어요.');
+  else toast('🖥 강사가 화면 공유를 시작했어요. 툴바의 [공유 화면 보기]를 누르면 볼 수 있어요.', 5000);
 }
 
 /** Server says the teacher moved. */
@@ -200,7 +254,8 @@ export function onTeacherNav(pos: Position) {
 
 export function setFollow(follow: boolean) {
   const s = get();
-  set({ follow, ...(follow ? { view: s.teacher } : {}) });
+  // Following the teacher includes the screen they are sharing.
+  set({ follow, ...(follow ? { view: s.teacher, screenView: true } : {}) });
 }
 
 /** Adds or replaces a 교안 in the list (the server broadcasts the list too; this is for the uploader). */

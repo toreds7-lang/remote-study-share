@@ -39,12 +39,18 @@ import { HtmlViewer } from './HtmlViewer.tsx';
 import { Menu } from './Menu.tsx';
 import { Modal } from './Modal.tsx';
 import { PdfViewer } from './PdfViewer.tsx';
+import { ScreenShareButton, ScreenToolbarInfo, ScreenViewer, WatchScreenButton } from './ScreenShare.tsx';
+
+/** Student is looking at the teacher's shared screen rather than the 교안. */
+const watchingScreen = (s: ReturnType<typeof useStore.getState>) =>
+  s.me?.role === 'student' && s.screen.live && s.screenView;
 
 export function LecturePane() {
   const paneRef = useRef<HTMLDivElement>(null);
   const viewDoc = useStore((s) => s.view.docId);
   const doc = useStore((s) => s.docs.find((d) => d.id === s.view.docId));
   const isTeacher = useStore((s) => s.me?.role === 'teacher');
+  const showScreen = useStore(watchingScreen);
   const [dropping, setDropping] = useState(false);
   const dragDepth = useRef(0);
 
@@ -57,9 +63,10 @@ export function LecturePane() {
       const t = e.target as HTMLElement;
       if (t.closest('input, textarea, select, [contenteditable="true"]')) return;
       const s = useStore.getState();
-      if (s.tab !== 'lecture') return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') step(1);
-      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') step(-1);
+      if (s.tab !== 'lecture' || watchingScreen(s)) return;
+      // ↑/↓ too: some presentation remotes (Canon's, for one) send only those.
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') step(1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') step(-1);
       else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && s.drawMode && s.view.docId) {
         undo(isTeacher ? 'teacher' : 'note', s.view.docId, s.view.page);
       } else return;
@@ -107,18 +114,31 @@ export function LecturePane() {
         void addLectureFiles([...e.dataTransfer.files]);
       }}
     >
-      <Toolbar paneRef={paneRef} />
-      {doc?.kind === 'html' ? <HtmlViewer key={doc.id} doc={doc} /> : <PdfViewer />}
+      <Toolbar paneRef={paneRef} showScreen={showScreen} />
+      {showScreen ? <ScreenViewer /> : doc?.kind === 'html' ? <HtmlViewer key={doc.id} doc={doc} /> : <PdfViewer />}
       {dropping && <div className="drop-overlay">놓으면 새 교안으로 올려요 · PDF·PPT·워드·엑셀·이미지·HTML·ZIP</div>}
     </div>
   );
 }
 
-function Toolbar({ paneRef }: { paneRef: React.RefObject<HTMLDivElement | null> }) {
+function Toolbar({ paneRef, showScreen }: { paneRef: React.RefObject<HTMLDivElement | null>; showScreen: boolean }) {
   const isTeacher = useStore((s) => s.me?.role === 'teacher');
   const drawMode = useStore((s) => s.drawMode);
   const showTeacherInk = useStore((s) => s.showTeacherInk);
+  const screenLive = useStore((s) => s.screen.live);
   const layer: Layer = isTeacher ? 'teacher' : 'note';
+
+  if (showScreen)
+    return (
+      <div className="toolbar">
+        <div className="toolbar-group">
+          <ScreenToolbarInfo />
+        </div>
+        <div className="toolbar-group right">
+          <FullscreenButton paneRef={paneRef} />
+        </div>
+      </div>
+    );
 
   return (
     <div className="toolbar">
@@ -147,6 +167,8 @@ function Toolbar({ paneRef }: { paneRef: React.RefObject<HTMLDivElement | null> 
         <span className="sep" />
         {isTeacher && <DocControls />}
         <SaveButtons />
+        {isTeacher && <ScreenShareButton />}
+        {!isTeacher && screenLive && <WatchScreenButton />}
       </div>
       <div className="toolbar-group right">
         {isTeacher ? <LiveBadge /> : <FollowToggle />}
@@ -565,7 +587,7 @@ function PageNav() {
       </button>
       <button
         className="icon-btn"
-        title="이전 페이지 (←)"
+        title="이전 페이지 (← ↑)"
         aria-label="이전 페이지"
         disabled={disabled || (view.page <= 1 && !isHtml)}
         onClick={() => step(-1)}
@@ -588,7 +610,7 @@ function PageNav() {
         onBlur={() => setDraft(String(view.page))}
       />
       <span className="muted small">/ {total || '-'}</span>
-      <button className="icon-btn" title="다음 페이지 (→)" aria-label="다음 페이지" disabled={disabled || atEnd} onClick={() => step(1)}>
+      <button className="icon-btn" title="다음 페이지 (→ ↓)" aria-label="다음 페이지" disabled={disabled || atEnd} onClick={() => step(1)}>
         <ChevronRight size={16} />
       </button>
     </div>

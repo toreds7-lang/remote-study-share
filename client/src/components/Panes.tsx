@@ -1,5 +1,5 @@
 import { Copy, Users } from 'lucide-react';
-import { setTab, toast, useStore } from '../store.ts';
+import { publicOrigin, setTab, toast, useStore } from '../store.ts';
 
 export function HomePane() {
   const room = useStore((s) => s.room);
@@ -8,7 +8,8 @@ export function HomePane() {
   const docs = useStore((s) => s.docs);
   const teacher = useStore((s) => s.teacher);
   const current = docs.find((d) => d.id === teacher.docId);
-  const joinUrl = `${location.origin}/room/${room?.code}`;
+  const serverUrls = useStore((s) => s.serverUrls);
+  const joinUrl = `${publicOrigin(serverUrls)}/room/${room?.code}`;
 
   async function copyLink() {
     try {

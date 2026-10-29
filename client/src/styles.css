@@ -586,6 +586,112 @@ button:disabled {
   padding: 8px;
 }
 
+/* ---------- 화면 공유 ---------- */
+.pill-btn.live {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.pill-btn.live:hover {
+  filter: brightness(0.97);
+}
+.btn.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.btn.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+.screen-view {
+  background: #000;
+  border-radius: var(--radius);
+}
+.screen-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.screen-status {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  background: rgb(0 0 0 / 0.65);
+  color: #fff;
+  text-align: center;
+}
+.screen-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 8px;
+}
+.screen-mode {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+.screen-nodes {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.screen-nodes th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.screen-nodes th,
+.screen-nodes td {
+  padding: 6px 8px 6px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.screen-nodes td:first-child {
+  white-space: normal;
+}
+.screen-nodes meter {
+  width: 60px;
+  vertical-align: middle;
+}
+.relay-help ol {
+  padding-left: 20px;
+  line-height: 1.6;
+}
+.relay-help li {
+  margin-bottom: 8px;
+}
+.relay-help code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.relay-help h3 {
+  font-size: 14px;
+  margin: 16px 0 0;
+}
+.copy-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.copy-line code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 6px 8px;
+}
+
 /* ---------- side panel ---------- */
 .side {
   display: flex;

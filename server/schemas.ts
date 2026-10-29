@@ -145,3 +145,24 @@ export const insertPageSchema = z.object({
   at: z.coerce.number().int().min(1).max(100000),
   paper: paper.default('blank'),
 });
+
+// ---- 화면 공유 ----
+// mediasoup checks the WebRTC parameters themselves; these only bound their shape.
+
+const mediaId = z.string().min(1).max(64);
+const mediaParams = z.record(z.string(), z.unknown());
+
+export const noArgsSchema = z.object({}).optional();
+export const screenConnectSchema = z.object({ transportId: mediaId, dtlsParameters: mediaParams });
+export const screenProduceSchema = z.object({ transportId: mediaId, kind: z.literal('video'), rtpParameters: mediaParams });
+/** `exclude`: PCs this browser couldn't get the screen through, so it is sent to another one. */
+export const screenJoinSchema = z.object({ exclude: z.array(z.string().max(100)).max(50).default([]) });
+export const screenConsumeSchema = z.object({ transportId: mediaId, rtpCapabilities: mediaParams });
+export const screenResumeSchema = z.object({ consumerId: mediaId });
+
+/** What a relay PC sends when it connects (socket.handshake.auth). */
+export const relayAuthSchema = z.object({
+  key: z.string().max(200),
+  name: z.string().trim().min(1).max(40),
+  seats: z.number().int().min(1).max(1000),
+});

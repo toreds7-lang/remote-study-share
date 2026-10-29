@@ -12,6 +12,8 @@ import type {
   PresenceUser,
   Question,
   RaisedHand,
+  ScreenNode,
+  ScreenState,
   Snapshot,
   Stroke,
 } from '../../shared/protocol.ts';
@@ -23,6 +25,7 @@ import {
   onDocEdited,
   onFiles,
   onLiveInk,
+  onScreenState,
   onTeacherNav,
   removeStrokes,
   setDocStrokes,
@@ -126,6 +129,11 @@ function bind(onUnauthorized: () => void) {
     set({ hands });
   });
   socket.on('hand:state', (raised: boolean) => set({ myHand: raised }));
+
+  socket.on('screen', (state: ScreenState) => onScreenState(state));
+  socket.on('screen:nodes', ({ nodes, error }: { nodes: ScreenNode[]; error: string }) =>
+    set((s) => ({ screen: { ...s.screen, nodes, error } })),
+  );
 
   socket.on('question:new', (q: Question) => {
     const s = get();
