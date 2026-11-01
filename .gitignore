@@ -5,3 +5,4 @@ data/
 env.txt
 *.log
 relay-bundle/
+release/

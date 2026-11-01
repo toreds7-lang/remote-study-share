@@ -1,0 +1,14 @@
+# StudyShare relay PC settings. Close the relay window and open StudyShare 릴레이 again after changing them.
+# The teacher sees the address and the key under 화면 공유 → 릴레이 PC 연결 방법.
+
+# The teacher's PC, e.g. http://10.0.0.5:3000
+ORIGIN=
+RELAY_KEY=
+# Name the teacher sees for this PC (empty = the computer name).
+RELAY_NAME=
+# Students the server sends to this PC first (a share, not a limit).
+RELAY_SEATS=30
+# WebRTC port for students, UDP and TCP; the 99 UDP ports after it carry the screen from the teacher's PC.
+SCREEN_PORT=3001
+# Addresses to offer students, comma-separated, if the automatic list picks a wrong adapter.
+SCREEN_IP=

@@ -197,7 +197,8 @@ function RelayDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void send<RelayInfo>('screen:relay-info', {}).then((res) => res.ok && setInfo(res.data));
   }, []);
-  const command = info ? `run-relay.bat ${publicOrigin()} ${info.key}` : '';
+  const origin = publicOrigin();
+  const command = info ? `run-relay.bat ${origin} ${info.key}` : '';
 
   async function copy(text: string) {
     try {
@@ -208,6 +209,15 @@ function RelayDialog({ onClose }: { onClose: () => void }) {
     }
   }
 
+  const copyLine = (text: string, what: string) => (
+    <div className="copy-line">
+      <code className="mono">{text}</code>
+      <button className="icon-btn" title="복사" aria-label={`${what} 복사`} onClick={() => void copy(text)}>
+        <Copy size={14} />
+      </button>
+    </div>
+  );
+
   return (
     <Modal title="릴레이 PC 연결" onClose={onClose} size="wide">
       <div className="relay-help">
@@ -217,27 +227,29 @@ function RelayDialog({ onClose }: { onClose: () => void }) {
         </p>
         <ol>
           <li>
-            이 PC에서 <code>npm run relay:bundle</code>을 한 번 실행하면 <code>relay-bundle</code> 폴더가 생겨요. Node.js가
-            들어 있어 설치 없이 돌아가요. 이 폴더를 남는 PC에 복사하세요 (USB·공유 폴더).
+            이 PC에 설치할 때 쓴 <code>StudyShare-Setup.exe</code>를 남는 PC에서 실행하고 <b>릴레이 PC</b>를 고르세요
+            (관리자 권한 필요). 방화벽도 설치하면서 열려요.
           </li>
           <li>
-            남는 PC에서 <code>firewall.bat</code>을 한 번 실행해 방화벽을 열어 주세요 (관리자 권한 필요. 회사 PC는 IT
-            담당자에게 요청해야 할 수 있어요). 이 PC에도 한 번 필요해요.
-          </li>
-          <li>
-            <code>run-relay.bat</code>을 실행하고 아래 주소와 키를 넣으세요. 또는 명령 한 줄:
-            {command ? (
-              <div className="copy-line">
-                <code className="mono">{command}</code>
-                <button className="icon-btn" title="복사" aria-label="명령 복사" onClick={() => void copy(command)}>
-                  <Copy size={14} />
-                </button>
-              </div>
+            설치 화면에 이 주소와 키를 넣으세요.
+            {info ? (
+              <>
+                {copyLine(origin, '주소')}
+                {copyLine(info.key, '키')}
+              </>
             ) : (
               <p className="muted small">불러오는 중…</p>
             )}
           </li>
+          <li>
+            설치가 끝나면 그 PC에서 <b>StudyShare 릴레이</b>를 켜세요. 아래 표에 나타나요.
+          </li>
         </ol>
+        <p className="muted small">
+          설치하지 않고 쓰려면: 프로젝트 폴더에서 <code>npm run relay:bundle</code>로 만든 <code>relay-bundle</code> 폴더를
+          남는 PC에 복사해 <code>firewall.bat</code>을 한 번 실행한 뒤, 이 명령을 실행하세요.
+        </p>
+        {command && copyLine(command, '명령')}
         {info && (
           <p className="muted small">
             이 PC 주소: {info.urls.join(', ') || '없음'} · 릴레이 PC 키: <span className="mono">{info.key}</span> (키는

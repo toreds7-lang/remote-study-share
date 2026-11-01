@@ -44,9 +44,26 @@ npm start            # serves dist/ + API + WebSocket on PORT
 
 Students on the same Wi-Fi can connect to the `Network:` address that is printed at startup.
 
+## Installing on other PCs (setup .exe)
+
+For a PC that should just run StudyShare, such as a company PC, build one setup file here and run it there. That PC needs no Node.js, no project folder, no `run.bat` and no `firewall.bat`.
+
+```bash
+npm run installer    # → release/StudyShare-Setup-<version>.exe (about 42 MB)
+```
+
+The build uses only what this PC already has: the Node.js running it is copied into the setup, and the setup program is compiled with the C# compiler that comes with Windows (`csc.exe`, .NET Framework 4). Copy the file to the other PC (USB stick or shared folder) and run it there. It asks for administrator rights once. The window then offers two roles:
+
+- **강사 PC — 수업 서버** (the teacher's PC). Installs to `C:\Program Files\StudyShare` and adds **StudyShare** to the Start menu and the desktop. It starts the server in a console window and opens the browser, like `run.bat`. **StudyShare 설정** opens the settings in Notepad. Settings (`env.txt`) and class data (`data\`) live in `C:\ProgramData\StudyShare`, which every user of the PC can write to and which upgrades and uninstalling leave alone. On the first install, **run.bat으로 쓰던 폴더에서 … 가져오기** copies the class data and settings (OpenAI key, port, …) from a project folder that ran `run.bat`, so classes, files and the relay key carry over. Close its `run.bat` window first.
+- **릴레이 PC** (a spare PC for 화면 공유). Asks for the teacher PC's address and the relay key (shown under **화면 공유 → 릴레이 PC 연결 방법**), writes them to `C:\ProgramData\StudyShare\relay.txt`, and adds **StudyShare 릴레이**. It can also start the relay when someone signs in to Windows.
+
+For either role, setup allows StudyShare's two programs (`node.exe` and `mediasoup-worker.exe` in its folder) through Windows Firewall on Domain and Private networks. The rules cover the programs rather than ports, so they keep working if `PORT` or `SCREEN_PORT` changes. Setup also removes any block rule Windows made for those programs. If a connected network is Public, the last page says so, because the rules don't apply there. Running a newer setup upgrades in place and offers the same role again. **Apps & Features → StudyShare → Uninstall** removes the program, its firewall rules and shortcuts, and asks before deleting the data.
+
+The setup isn't code-signed, so if it was downloaded rather than copied, Windows SmartScreen may ask first (**More info → Run anyway**), and a company that only allows signed programs may need IT to approve or sign it.
+
 ## Configuration
 
-Settings are read from `.env` or `env.txt` in the project root (see [.env.example](.env.example)):
+Settings are read from `.env` or `env.txt` in the project root (see [.env.example](.env.example)). An installed StudyShare reads them from `C:\ProgramData\StudyShare\env.txt` instead: the folder named by `STUDYSHARE_HOME`, which its Start menu shortcut sets. A relative `DATA_DIR` is resolved against that folder too.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -68,17 +85,19 @@ Settings are read from `.env` or `env.txt` in the project root (see [.env.exampl
 
 The browser only lets a page capture the screen on `localhost` or over HTTPS, so the teacher opens StudyShare on their own PC at `http://localhost:3000` (`run.bat` does). Students use the PC's network address. **홈 → 학생 입장 링크 복사** gives that address even when the teacher is on `localhost`.
 
-Run `firewall.bat` once on the teacher's PC. It asks for administrator rights and opens TCP 3000 (the page), UDP and TCP 3001 (screen to students), and UDP 3002–3100 (screen to relay PCs), on Domain and Private networks only. `firewall.bat remove` undoes it. On a company PC, IT may have to do this, or a group policy may override it.
+When StudyShare runs from this project folder, run `firewall.bat` once on the teacher's PC. It asks for administrator rights and opens TCP 3000 (the page), UDP and TCP 3001 (screen to students), and UDP 3002–3100 (screen to relay PCs), on Domain and Private networks only. `firewall.bat remove` undoes it. The [setup .exe](#installing-on-other-pcs-setup-exe) does this as it installs. On a company PC, a group policy may override either one; then IT has to allow it.
 
 **How the load works.** The teacher's browser encodes the screen once and sends it to the server, which copies packets to each student without decoding them (an SFU, [mediasoup](https://mediasoup.org)). The teacher's PC therefore does one encode regardless of class size, and forwarding is cheap. Measured on a Ryzen 5 3600 with 30 students and a worst-case 1080p stream at the 2.5 Mbps cap, the forwarding process used about 20% of one CPU core, and the PC sent about 75 Mbps. What grows with the class is **network traffic**: about 2.5 Mbps per student (5 Mbps in 동영상 mode). Compare that to the teacher PC's link speed (`Get-NetAdapter` → LinkSpeed): 30 students fit easily on gigabit Ethernet, but not in 동영상 mode on a 100 Mbps port or over Wi-Fi.
 
 **Relay PCs** add capacity where that runs out. A relay receives the screen once from the teacher's PC and sends it to the students the server assigns to it. Students never pick a PC; they all open the teacher's address. The server puts each new student on the PC with the most free seats (`SCREEN_DIRECT_SEATS` on the teacher's PC, `--seats`, default 30, on a relay). If a relay is switched off, its students move to another PC within seconds. A student who gets no picture through a PC (a firewall, say) is moved too. A relay only helps if it has its own network link: on the same Wi-Fi as the students, it adds traffic instead of removing it.
 
-To add a relay PC:
+To add a relay PC, run the [setup .exe](#installing-on-other-pcs-setup-exe) on it, choose **릴레이 PC**, and enter the address and key shown under **화면 공유 → 릴레이 PC 연결 방법**. Then start **StudyShare 릴레이**. The teacher's sharing panel lists the PC and its students.
 
-1. On the teacher's PC, run `npm run relay:bundle` once. This makes `relay-bundle/` (about 100 MB): Node itself, the relay as one script, the mediasoup worker and batch files. Nothing has to be installed on the relay PC.
+Without installing anything:
+
+1. On the teacher's PC, run `npm run relay:bundle` once. This makes `relay-bundle/` (about 100 MB): Node itself, the relay as one script, the mediasoup worker and batch files.
 2. Copy the folder to the spare PC, and run its `firewall.bat` once.
-3. Run `run-relay.bat`, and enter the address and key shown under **화면 공유 → 릴레이 PC 연결 방법**. The teacher's sharing panel then lists the PC and its students.
+3. Run `run-relay.bat`, and enter the address and key.
 
 From a checkout with Node installed, `npm run relay -- --origin http://<teacher-pc>:3000 --key <key>` does the same.
 
@@ -111,13 +130,15 @@ server/   index.ts (HTTP + Vite/dist) · api.ts (REST, uploads, downloads) · re
           convert.ts (images/Office/whiteboards → PDF, page edits) · office-to-pdf.ps1 (Microsoft Office)
           site.ts + site-bridge.js (live HTML) · unzip.ts
           screen.ts (화면 공유: shares, relay PCs, which PC serves whom) · media.ts (mediasoup, also used by relays)
-          relay.ts (relay PC program) · relay-bundle.ts (npm run relay:bundle)
+          relay.ts (relay PC program) · relay-bundle.ts (npm run relay:bundle) · bundle.ts (esbuild for both builds)
 client/   src/screen.ts (capture, send, receive, switch PC) · components/ScreenShare.tsx (화면 공유 UI)
           src/components/PdfViewer.tsx · HtmlViewer.tsx · InkLayers.tsx (drawing) · LecturePane.tsx (toolbar)
           FilesPane.tsx (파일) · lecture.ts (adding 교안 and pages) · frame.ts (talks to the HTML frame)
           Questions / Chat / AiPanel / Room / Lobby / Modal · store.ts (zustand) · socket.ts · export.ts
 shared/   protocol.ts (types shared by both sides) · files.ts (file kinds, preview rules)
 relay/    run-relay.bat · firewall.bat · README.txt (copied into relay-bundle/)
+installer/ build.ts (npm run installer) · Setup.cs + SetupForm.cs (setup and uninstaller, C#)
+          StudyShare.cmd · StudyShare-Relay.cmd (what the shortcuts start) · icon.ts · relay.example.txt
 firewall.bat + firewall.ps1   open Windows Firewall for the page and 화면 공유
 ```
 

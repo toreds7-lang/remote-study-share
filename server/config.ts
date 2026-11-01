@@ -2,11 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const ROOT = path.resolve(import.meta.dirname, '..');
+// Settings and data: the project root, or STUDYSHARE_HOME. The installed app sets that to
+// %ProgramData%\StudyShare, since its own folder under Program Files is read-only.
+const HOME = process.env.STUDYSHARE_HOME ? path.resolve(process.env.STUDYSHARE_HOME) : ROOT;
 
-// Load .env (preferred) or env.txt from the project root. Variables already set
+// Load .env (preferred) or env.txt from HOME. Variables already set
 // in the real environment win.
 for (const file of ['.env', 'env.txt']) {
-  const p = path.join(ROOT, file);
+  const p = path.join(HOME, file);
   if (fs.existsSync(p)) {
     const before = { ...process.env };
     process.loadEnvFile(p);
@@ -14,7 +17,7 @@ for (const file of ['.env', 'env.txt']) {
   }
 }
 
-const dataDir = path.resolve(ROOT, process.env.DATA_DIR ?? 'data');
+const dataDir = path.resolve(HOME, process.env.DATA_DIR ?? 'data');
 const port = Number(process.env.PORT ?? 3000);
 
 export const config = {

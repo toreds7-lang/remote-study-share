@@ -10,7 +10,8 @@
     "start": "tsx --disable-warning=ExperimentalWarning server/index.ts --prod",
     "typecheck": "tsc -p server && tsc -p client",
     "relay": "tsx --disable-warning=ExperimentalWarning server/relay.ts",
-    "relay:bundle": "tsx --disable-warning=ExperimentalWarning server/relay-bundle.ts"
+    "relay:bundle": "tsx --disable-warning=ExperimentalWarning server/relay-bundle.ts",
+    "installer": "tsx --disable-warning=ExperimentalWarning installer/build.ts"
   },
   "engines": {
     "node": ">=22.13"
